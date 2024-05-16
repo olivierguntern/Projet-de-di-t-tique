@@ -1,3 +1,6 @@
+# Projet de santé utilisant - une bases de données open source** :
+  - Open Food Facts (base de données libre et ouverte sur les produits alimentaires)
+    
 # Compétences et Techniques Utilisées
 
 ## Nettoyage de données
@@ -13,8 +16,7 @@
   - Corrélations
   - ANOVA
 - **Détection et gestion des outliers**
-- **Utilisation de bases de données open source** :
-  - Open Food Facts (base de données libre et ouverte sur les produits alimentaires)
+
 
 ## Visualisation de données
 - **Création de graphiques** pour l'exploration des variables et des distributions
