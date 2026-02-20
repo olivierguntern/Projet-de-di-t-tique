@@ -369,7 +369,7 @@ def main():
     parser.add_argument("--height", type=int, default=720, help="Hauteur vidéo (défaut: 720)")
     parser.add_argument("--fps", type=int, default=24, help="Images par seconde (défaut: 24)")
     parser.add_argument("--font-size", type=int, default=60, help="Taille de police (défaut: 60)")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     audio_path = args.audio
     if not os.path.exists(audio_path):
