@@ -16,7 +16,11 @@ Arguments :
     --engine        : Moteur OCR : tesseract | easyocr                  [défaut : tesseract]
     --lang          : Langue(s) OCR                                     [défaut : fra+eng (tesseract) / fr,en (easyocr)]
     --tesseract-path: Chemin complet vers tesseract.exe si non dans PATH
-    --debug         : Enregistre les vignettes de chaque zone dans ./debug_zones/
+    --preprocess    : Mode de prétraitement : auto | neon | aucun        [défaut : auto]
+                      auto  = binarisation adaptative (documents, texte sombre sur fond clair)
+                      neon  = texte lumineux/coloré sur fond sombre (interface jeu, HUD…)
+                      aucun = image brute sans prétraitement
+    --debug         : Enregistre les vignettes prétraitées dans ./debug_zones/
 
 Installation :
     pip install pytesseract pillow          # + Tesseract-OCR : https://github.com/UB-Mannheim/tesseract/wiki
@@ -134,24 +138,58 @@ def ocr_easyocr(reader, crop: np.ndarray) -> str:
 
 # ─── Prétraitement image ──────────────────────────────────────────────────────
 
-def pretraiter(crop: np.ndarray) -> np.ndarray:
-    """Améliore le contraste pour l'OCR (niveaux de gris + binarisation adaptative)."""
+def pretraiter(crop: np.ndarray, mode: str = "auto") -> np.ndarray:
+    """
+    Prépare la zone pour l'OCR selon le mode choisi.
+
+    auto  : binarisation adaptative — documents, texte sombre sur fond clair
+    neon  : texte lumineux/coloré sur fond sombre (HUD, interface jeu…)
+    aucun : image brute
+    """
+    if mode == "aucun":
+        return crop
+
+    if mode == "neon":
+        # 1) Agrandissement 3× (Tesseract préfère les grandes images)
+        h, w = crop.shape[:2]
+        grand = cv2.resize(crop, (w * 3, h * 3), interpolation=cv2.INTER_CUBIC)
+
+        # 2) Passage en HSV pour extraire la luminosité (canal V)
+        #    Le texte néon est très lumineux même si coloré
+        hsv = cv2.cvtColor(grand, cv2.COLOR_BGR2HSV)
+        _, _, v = cv2.split(hsv)
+
+        # 3) Légère réduction du halo (flou médian)
+        v = cv2.medianBlur(v, 3)
+
+        # 4) Seuillage OTSU : sépare automatiquement le texte brillant du fond sombre
+        _, binaire = cv2.threshold(v, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # 5) Inversion → texte noir sur fond blanc (attendu par Tesseract)
+        binaire = cv2.bitwise_not(binaire)
+
+        # 6) Dilatation légère pour combler les trous dans les lettres
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        binaire = cv2.morphologyEx(binaire, cv2.MORPH_CLOSE, kernel)
+
+        return cv2.cvtColor(binaire, cv2.COLOR_GRAY2BGR)
+
+    # mode == "auto" : binarisation adaptative (défaut)
     gris = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    # Binarisation adaptative (utile pour les fonds non uniformes)
     binaire = cv2.adaptiveThreshold(
         gris, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
         blockSize=31, C=10
     )
-    # Repasse en BGR pour compatibilité avec les deux moteurs
     return cv2.cvtColor(binaire, cv2.COLOR_GRAY2BGR)
 
 
 # ─── Traitement principal ─────────────────────────────────────────────────────
 
 def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
-            chemin_out: str, debug: bool, tesseract_path: str | None = None):
+            chemin_out: str, debug: bool, tesseract_path: str | None = None,
+            preprocess: str = "auto"):
 
     # Initialiser le moteur OCR
     if engine == "tesseract":
@@ -200,7 +238,7 @@ def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
                 h  = max(1, min(h,  h_img - y))
 
                 crop = image[y:y + h, x:x + w]
-                crop_traite = pretraiter(crop)
+                crop_traite = pretraiter(crop, preprocess)
 
                 try:
                     texte = fn_ocr(ctx, crop_traite)
@@ -221,8 +259,9 @@ def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
                 print(f"   Zone #{zone['id']} ({zone['label'] or '-'}) : {texte_csv[:80]}")
 
                 if debug:
+                    # Enregistre l'image prétraitée pour vérification
                     nom = f"debug_zones/{img_path.stem}_z{zone['id']}.png"
-                    cv2.imwrite(nom, crop)
+                    cv2.imwrite(nom, crop_traite)
 
         print(f"\nRésultats sauvegardés dans : {os.path.abspath(chemin_out)}")
 
@@ -242,8 +281,11 @@ def main():
                         help="Langue(s) : fra+eng (tesseract) ou fr,en (easyocr)")
     parser.add_argument("--tesseract-path", default=None,
                         help=r'Chemin vers tesseract.exe, ex: "C:\Program Files\Tesseract-OCR\tesseract.exe"')
+    parser.add_argument("--preprocess", default="auto",
+                        choices=["auto", "neon", "aucun"],
+                        help="Mode de prétraitement : auto | neon | aucun [défaut: auto]")
     parser.add_argument("--debug",  action="store_true",
-                        help="Enregistre les vignettes de zones dans ./debug_zones/")
+                        help="Enregistre les vignettes prétraitées dans ./debug_zones/")
     args = parser.parse_args()
 
     if not os.path.isfile(args.zones):
@@ -259,7 +301,7 @@ def main():
     print(f"{len(zones)} zone(s) chargée(s) depuis {args.zones}")
 
     traiter(args.images, zones, args.engine, args.lang, chemin_out, args.debug,
-            args.tesseract_path)
+            args.tesseract_path, args.preprocess)
 
 
 if __name__ == "__main__":
