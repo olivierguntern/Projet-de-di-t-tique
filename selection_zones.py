@@ -11,17 +11,16 @@ Usage :
 
 Contrôles :
     - Clic gauche + glisser : Dessiner un rectangle
-    - Entrée / Espace       : Valider et sauvegarder la zone
-    - Z                     : Annuler la dernière zone
+    - Entrée / Espace       : Valider la zone en cours
+    - Z                     : Annuler la dernière zone validée
     - C                     : Effacer toutes les zones
-    - Q / Echap             : Quitter et sauvegarder le CSV
+    - Q / Echap             : Quitter (les labels sont demandés ensuite dans le terminal)
 """
 
 import argparse
 import csv
 import os
 from datetime import datetime
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -31,25 +30,22 @@ import mss.tools
 
 # ─── Variables globales pour le callback souris ───────────────────────────────
 
-drawing = False          # True pendant le clic-glissé
-pt_debut = (-1, -1)      # Point de départ du rectangle
-pt_fin = (-1, -1)        # Point de fin du rectangle
-rect_courant = None      # Rectangle en cours de dessin
-zones = []               # Liste des zones validées : [(x, y, w, h, label)]
+drawing = False
+pt_debut = (-1, -1)
+pt_fin = (-1, -1)
+rect_courant = None   # Rectangle terminé en attente de validation : (x, y, w, h)
+zones = []            # Zones validées : [(x, y, w, h)]
 
 
 def faire_capture() -> np.ndarray:
-    """Prend une capture d'écran et retourne un tableau numpy (BGR)."""
     with mss.mss() as sct:
-        monitor = sct.monitors[0]
+        monitor = sct.monitors[1]
         sct_img = sct.grab(monitor)
-        # mss retourne BGRA, on enlève le canal alpha
         img = np.array(sct_img)[:, :, :3]
     return img
 
 
 def callback_souris(event, x, y, flags, param):
-    """Callback OpenCV pour la gestion des événements souris."""
     global drawing, pt_debut, pt_fin, rect_courant
 
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -65,7 +61,6 @@ def callback_souris(event, x, y, flags, param):
     elif event == cv2.EVENT_LBUTTONUP:
         drawing = False
         pt_fin = (x, y)
-        # Normaliser pour garantir x1 < x2 et y1 < y2
         x1 = min(pt_debut[0], pt_fin[0])
         y1 = min(pt_debut[1], pt_fin[1])
         x2 = max(pt_debut[0], pt_fin[0])
@@ -74,178 +69,148 @@ def callback_souris(event, x, y, flags, param):
             rect_courant = (x1, y1, x2 - x1, y2 - y1)
 
 
-def dessiner_zones(image: np.ndarray, zones: list, rect_temp=None) -> np.ndarray:
-    """
-    Dessine toutes les zones validées et le rectangle en cours sur l'image.
-
-    Args:
-        image: Image de fond (non modifiée)
-        zones: Liste des zones [(x, y, w, h, label)]
-        rect_temp: Rectangle temporaire en cours de dessin (x1,y1,x2,y2) ou None
-
-    Returns:
-        Image avec les rectangles dessinés
-    """
+def dessiner_zones(image: np.ndarray, zones: list, rect_temp=None, rect_valide=None) -> np.ndarray:
     affichage = image.copy()
 
     # Zones validées (vert)
-    for idx, (x, y, w, h, label) in enumerate(zones):
+    for idx, (x, y, w, h) in enumerate(zones):
         cv2.rectangle(affichage, (x, y), (x + w, y + h), (0, 200, 0), 2)
-        texte = f"#{idx + 1} {label}" if label else f"#{idx + 1}"
-        cv2.putText(
-            affichage, texte, (x + 4, y + 18),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2
-        )
+        cv2.putText(affichage, f"#{idx + 1}", (x + 4, y + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
 
-    # Rectangle temporaire en cours (bleu)
+    # Rectangle en cours de dessin (bleu clair)
     if rect_temp is not None:
         x1, y1, x2, y2 = rect_temp
-        cv2.rectangle(affichage, (x1, y1), (x2, y2), (255, 100, 0), 2)
+        cv2.rectangle(affichage, (x1, y1), (x2, y2), (255, 150, 0), 2)
 
-    # Légende
+    # Rectangle terminé, en attente de validation (orange)
+    if rect_valide is not None:
+        x, y, w, h = rect_valide
+        cv2.rectangle(affichage, (x, y), (x + w, y + h), (0, 165, 255), 2)
+        cv2.putText(affichage, "ENTREE=valider  Z=annuler", (x + 4, y - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 165, 255), 2)
+
+    # Légende en bas
     h_img = affichage.shape[0]
-    lignes = [
-        "Clic+glisser : Dessiner  |  Entree : Valider  |  Z : Annuler derniere",
-        "C : Tout effacer  |  Q/Echap : Quitter et sauvegarder",
-    ]
-    for i, ligne in enumerate(lignes):
-        cv2.putText(
-            affichage, ligne, (10, h_img - 30 + i * 20),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 255), 1
-        )
+    cv2.rectangle(affichage, (0, h_img - 42), (affichage.shape[1], h_img), (30, 30, 30), -1)
+    cv2.putText(affichage,
+                "Dessiner: clic+glisser  |  Valider: Entree/Espace  |  Annuler derniere: Z  |  Tout effacer: C  |  Quitter: Q",
+                (8, h_img - 24), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+    cv2.putText(affichage, f"Zones enregistrees : {len(zones)}",
+                (8, h_img - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 0), 1)
 
     return affichage
 
 
-def demander_label() -> str:
-    """Demande un label pour la zone dans le terminal."""
-    label = input("  Label pour cette zone (laisser vide pour ignorer) : ").strip()
-    return label
-
-
-def sauvegarder_csv(zones: list, chemin_csv: str):
-    """
-    Sauvegarde les zones dans un fichier CSV.
-
-    Colonnes : id, label, x, y, largeur, hauteur, x2, y2
-    """
+def sauvegarder_csv(zones: list, labels: list, chemin_csv: str):
     with open(chemin_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["id", "label", "x", "y", "largeur", "hauteur", "x2", "y2"])
-        for idx, (x, y, w, h, label) in enumerate(zones, start=1):
+        for idx, ((x, y, w, h), label) in enumerate(zip(zones, labels), start=1):
             writer.writerow([idx, label, x, y, w, h, x + w, y + h])
-
     print(f"\n{len(zones)} zone(s) sauvegardée(s) dans : {os.path.abspath(chemin_csv)}")
 
 
 def selectionner_zones(image: np.ndarray, chemin_csv: str):
-    """
-    Lance l'interface interactive de sélection de zones.
-
-    Args:
-        image: Image sur laquelle sélectionner les zones
-        chemin_csv: Chemin du fichier CSV de sortie
-    """
     global drawing, pt_debut, pt_fin, rect_courant, zones
 
-    fenetre = "Selection de zones - Q pour quitter"
+    fenetre = "Selection de zones  -  Q pour quitter"
     cv2.namedWindow(fenetre, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(fenetre, min(image.shape[1], 1400), min(image.shape[0], 900))
     cv2.setMouseCallback(fenetre, callback_souris)
 
-    print("\nFenêtre OpenCV ouverte.")
-    print("Dessinez des rectangles avec la souris, puis :")
-    print("  Entree/Espace : valider la zone sélectionnée")
-    print("  Z             : annuler la dernière zone")
-    print("  C             : effacer tout")
-    print("  Q / Echap     : quitter et sauvegarder\n")
+    print("Fenetre ouverte.")
+    print("  Dessinez des rectangles, puis Entree pour valider, Q pour quitter.\n")
 
     while True:
-        # Construire le rectangle temporaire pour l'affichage live
+        # Rectangle temporaire (pendant le glisser)
         rect_temp = None
-        if drawing and pt_debut != (-1, -1):
+        if drawing:
             x1 = min(pt_debut[0], pt_fin[0])
             y1 = min(pt_debut[1], pt_fin[1])
             x2 = max(pt_debut[0], pt_fin[0])
             y2 = max(pt_debut[1], pt_fin[1])
             rect_temp = (x1, y1, x2, y2)
 
-        affichage = dessiner_zones(image, zones, rect_temp)
+        affichage = dessiner_zones(image, zones, rect_temp, rect_courant)
         cv2.imshow(fenetre, affichage)
 
         touche = cv2.waitKey(30) & 0xFF
 
-        # Valider la zone courante
-        if touche in (13, 32) and rect_courant is not None:  # Entrée ou Espace
-            x, y, w, h = rect_courant
-            print(f"\nZone {len(zones) + 1} : x={x}, y={y}, largeur={w}, hauteur={h}")
-            label = demander_label()
-            zones.append((x, y, w, h, label))
-            rect_courant = None
-            print(f"  -> Zone #{len(zones)} enregistrée.")
+        # Valider la zone en attente
+        if touche in (13, 32):  # Entrée ou Espace
+            if rect_courant is not None:
+                zones.append(rect_courant)
+                print(f"Zone #{len(zones)} validee : x={rect_courant[0]}, y={rect_courant[1]}, "
+                      f"largeur={rect_courant[2]}, hauteur={rect_courant[3]}")
+                rect_courant = None
 
         # Annuler la dernière zone
-        elif touche == ord('z') or touche == ord('Z'):
-            if zones:
-                supprimee = zones.pop()
-                print(f"Zone #{len(zones) + 1} annulée.")
-            else:
-                print("Aucune zone à annuler.")
+        elif touche in (ord('z'), ord('Z')):
+            if rect_courant is not None:
+                rect_courant = None
+                print("Rectangle annule.")
+            elif zones:
+                zones.pop()
+                print(f"Derniere zone supprimee. Zones restantes : {len(zones)}")
 
-        # Effacer toutes les zones
-        elif touche == ord('c') or touche == ord('C'):
+        # Effacer tout
+        elif touche in (ord('c'), ord('C')):
             zones.clear()
             rect_courant = None
-            print("Toutes les zones ont été effacées.")
+            print("Toutes les zones effacees.")
 
         # Quitter
-        elif touche in (27, ord('q'), ord('Q')):  # Echap ou Q
+        elif touche in (27, ord('q'), ord('Q')):
+            break
+
+        # Fermeture via la croix de la fenêtre
+        if cv2.getWindowProperty(fenetre, cv2.WND_PROP_VISIBLE) < 1:
             break
 
     cv2.destroyAllWindows()
 
-    if zones:
-        sauvegarder_csv(zones, chemin_csv)
-    else:
-        print("Aucune zone enregistrée.")
+    if not zones:
+        print("Aucune zone enregistree.")
+        return
+
+    # Demander les labels dans le terminal APRÈS fermeture de la fenêtre
+    print(f"\n{len(zones)} zone(s) selectionnee(s).")
+    print("Entrez un label pour chaque zone (laisser vide = pas de label) :\n")
+    labels = []
+    for idx, (x, y, w, h) in enumerate(zones, start=1):
+        label = input(f"  Zone #{idx} (x={x}, y={y}, w={w}, h={h}) - Label : ").strip()
+        labels.append(label)
+
+    sauvegarder_csv(zones, labels, chemin_csv)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sélection de zones rectangulaires sur image avec OpenCV → CSV"
+        description="Selection de zones rectangulaires sur image avec OpenCV -> CSV"
     )
     parser.add_argument(
-        "--image",
-        type=str,
-        default=None,
-        help="Chemin vers une image existante. Si absent, une capture d'écran est prise."
+        "--image", type=str, default=None,
+        help="Chemin vers une image. Si absent, capture d'ecran automatique."
     )
     parser.add_argument(
-        "--csv",
-        type=str,
-        default=None,
-        help="Chemin du fichier CSV de sortie (défaut: zones_YYYYMMDD_HHMMSS.csv)"
+        "--csv", type=str, default=None,
+        help="Fichier CSV de sortie (defaut: zones_YYYYMMDD_HHMMSS.csv)"
     )
     args = parser.parse_args()
 
-    # Fichier CSV de sortie
-    if args.csv:
-        chemin_csv = args.csv
-    else:
-        horodatage = datetime.now().strftime("%Y%m%d_%H%M%S")
-        chemin_csv = f"zones_{horodatage}.csv"
+    chemin_csv = args.csv or f"zones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
-    # Chargement de l'image
     if args.image:
         image = cv2.imread(args.image)
         if image is None:
             print(f"Erreur : impossible d'ouvrir '{args.image}'.")
             return
-        print(f"Image chargée : {args.image}")
+        print(f"Image chargee : {args.image}")
     else:
-        print("Prise d'une capture d'écran...")
+        print("Prise d'une capture d'ecran...")
         image = faire_capture()
-        print("Capture prête.")
+        print("Capture prete.")
 
     selectionner_zones(image, chemin_csv)
 
