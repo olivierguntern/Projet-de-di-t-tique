@@ -13,9 +13,10 @@ Arguments :
     --zones   : CSV des zones (x, y, largeur, hauteur, label)          [obligatoire]
     --images  : Répertoire contenant les images à analyser              [défaut : .]
     --out     : Fichier CSV de sortie                                   [défaut : resultats_ocr_DATETIME.csv]
-    --engine  : Moteur OCR : tesseract | easyocr                        [défaut : tesseract]
-    --lang    : Langue(s) OCR                                           [défaut : fra+eng (tesseract) / fr,en (easyocr)]
-    --debug   : Enregistre les vignettes de chaque zone dans ./debug_zones/
+    --engine        : Moteur OCR : tesseract | easyocr                  [défaut : tesseract]
+    --lang          : Langue(s) OCR                                     [défaut : fra+eng (tesseract) / fr,en (easyocr)]
+    --tesseract-path: Chemin complet vers tesseract.exe si non dans PATH
+    --debug         : Enregistre les vignettes de chaque zone dans ./debug_zones/
 
 Installation :
     pip install pytesseract pillow          # + Tesseract-OCR : https://github.com/UB-Mannheim/tesseract/wiki
@@ -57,24 +58,49 @@ def charger_zones(chemin_csv: str) -> list[dict]:
 
 # ─── Moteur Tesseract ─────────────────────────────────────────────────────────
 
-def init_tesseract(lang: str):
+def trouver_tesseract() -> str | None:
+    """Cherche l'exécutable tesseract dans les emplacements courants (Windows)."""
+    import glob
+    candidates = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        r"C:\Users\*\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+        r"C:\tools\Tesseract-OCR\tesseract.exe",
+    ]
+    for pattern in candidates:
+        matches = glob.glob(pattern)
+        if matches:
+            return matches[0]
+    return None
+
+
+def init_tesseract(lang: str, chemin_exe: str | None = None):
     try:
         import pytesseract
-        # Cherche l'exécutable Tesseract sur Windows si non dans le PATH
-        if sys.platform == "win32":
-            candidates = [
-                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-            ]
-            for c in candidates:
-                if os.path.isfile(c):
-                    pytesseract.pytesseract.tesseract_cmd = c
-                    break
+        if chemin_exe:
+            # Chemin fourni explicitement
+            if not os.path.isfile(chemin_exe):
+                print(f"ERREUR : tesseract introuvable à : {chemin_exe}")
+                sys.exit(1)
+            pytesseract.pytesseract.tesseract_cmd = chemin_exe
+            print(f"Tesseract : {chemin_exe}")
+        elif sys.platform == "win32":
+            trouve = trouver_tesseract()
+            if trouve:
+                pytesseract.pytesseract.tesseract_cmd = trouve
+                print(f"Tesseract détecté : {trouve}")
+            else:
+                print(
+                    "ERREUR : tesseract.exe introuvable.\n"
+                    "  Solutions :\n"
+                    "  1) Ajoutez Tesseract-OCR au PATH Windows, OU\n"
+                    "  2) Utilisez : --tesseract-path \"C:\\chemin\\vers\\tesseract.exe\"\n"
+                    "  Téléchargement : https://github.com/UB-Mannheim/tesseract/wiki"
+                )
+                sys.exit(1)
         return pytesseract, lang
     except ImportError:
-        print("ERREUR : pytesseract non installé.\n"
-              "  pip install pytesseract\n"
-              "  + installer Tesseract-OCR : https://github.com/UB-Mannheim/tesseract/wiki")
+        print("ERREUR : pytesseract non installé.\n  pip install pytesseract")
         sys.exit(1)
 
 
@@ -125,11 +151,11 @@ def pretraiter(crop: np.ndarray) -> np.ndarray:
 # ─── Traitement principal ─────────────────────────────────────────────────────
 
 def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
-            chemin_out: str, debug: bool):
+            chemin_out: str, debug: bool, tesseract_path: str | None = None):
 
     # Initialiser le moteur OCR
     if engine == "tesseract":
-        ctx = init_tesseract(lang or "fra+eng")
+        ctx = init_tesseract(lang or "fra+eng", tesseract_path)
         fn_ocr = ocr_tesseract
     else:
         ctx = init_easyocr(lang or "fr,en")
@@ -214,6 +240,8 @@ def main():
                         help="Moteur OCR [défaut: tesseract]")
     parser.add_argument("--lang",   default=None,
                         help="Langue(s) : fra+eng (tesseract) ou fr,en (easyocr)")
+    parser.add_argument("--tesseract-path", default=None,
+                        help=r'Chemin vers tesseract.exe, ex: "C:\Program Files\Tesseract-OCR\tesseract.exe"')
     parser.add_argument("--debug",  action="store_true",
                         help="Enregistre les vignettes de zones dans ./debug_zones/")
     args = parser.parse_args()
@@ -230,7 +258,8 @@ def main():
     zones = charger_zones(args.zones)
     print(f"{len(zones)} zone(s) chargée(s) depuis {args.zones}")
 
-    traiter(args.images, zones, args.engine, args.lang, chemin_out, args.debug)
+    traiter(args.images, zones, args.engine, args.lang, chemin_out, args.debug,
+            args.tesseract_path)
 
 
 if __name__ == "__main__":
