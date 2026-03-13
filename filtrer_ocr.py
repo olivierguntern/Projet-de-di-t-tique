@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 def extraire_chiffres(texte: str) -> str:
-    return re.sub(r"\D", "", texte)
+    return re.sub(r"[^\d.]", "", texte)
 
 
 def filtrer(chemin_in: str, chemin_out: str):
