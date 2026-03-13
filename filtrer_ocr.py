@@ -42,7 +42,7 @@ def filtrer(chemin_in: str, chemin_out: str):
         for row in reader:
             total += 1
             chiffres = extraire_chiffres(row["texte_ocr"])
-            if chiffres:
+            if re.search(r"\d\.\d", chiffres):
                 row["texte_ocr"] = chiffres
                 writer.writerow(row)
                 gardees += 1
