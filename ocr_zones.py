@@ -34,6 +34,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Force UTF-8 sur stdout/stderr (Windows cp1252 ne supporte pas les caractères Unicode)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import cv2
 import numpy as np
 
