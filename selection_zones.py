@@ -174,13 +174,31 @@ def selectionner_zones(image: np.ndarray, chemin_csv: str):
         print("Aucune zone enregistree.")
         return
 
-    # Demander les labels dans le terminal APRÈS fermeture de la fenêtre
+    # Demander les labels via popup tkinter (fonctionne depuis le launcher)
     print(f"\n{len(zones)} zone(s) selectionnee(s).")
-    print("Entrez un label pour chaque zone (laisser vide = pas de label) :\n")
+    print("Saisie des labels via popup...")
     labels = []
-    for idx, (x, y, w, h) in enumerate(zones, start=1):
-        label = input(f"  Zone #{idx} (x={x}, y={y}, w={w}, h={h}) - Label : ").strip()
-        labels.append(label)
+    try:
+        import tkinter as tk
+        from tkinter import simpledialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        for idx, (x, y, w, h) in enumerate(zones, start=1):
+            label = simpledialog.askstring(
+                title=f"Zone #{idx}",
+                prompt=f"Zone #{idx}  (x={x}, y={y}, w={w}, h={h})\nLabel :",
+                parent=root,
+            ) or ""
+            label = label.strip()
+            labels.append(label)
+            print(f"  Zone #{idx} -> label : '{label}'")
+        root.destroy()
+    except Exception:
+        # Fallback terminal si tkinter indisponible
+        for idx, (x, y, w, h) in enumerate(zones, start=1):
+            label = input(f"  Zone #{idx} (x={x}, y={y}, w={w}, h={h}) - Label : ").strip()
+            labels.append(label)
 
     sauvegarder_csv(zones, labels, chemin_csv)
 
