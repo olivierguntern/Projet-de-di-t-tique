@@ -70,8 +70,11 @@ def analyser_fft(x: np.ndarray) -> dict:
 def decomposer_stl(x: np.ndarray, periode: int) -> dict | None:
     try:
         from statsmodels.tsa.seasonal import STL
-        if len(x) < 2 * periode:
-            return None
+    except ImportError:
+        return {"erreur": "statsmodels absent  →  pip install statsmodels"}
+    if len(x) < 2 * periode:
+        return {"erreur": f"série trop courte ({len(x)} pts < 2×{periode})"}
+    try:
         res = STL(x, period=periode, robust=True).fit()
         force_saison = 1 - np.var(res.resid) / (np.var(res.seasonal + res.resid) + 1e-10)
         force_trend  = 1 - np.var(res.resid) / (np.var(res.trend  + res.resid) + 1e-10)
@@ -82,8 +85,8 @@ def decomposer_stl(x: np.ndarray, periode: int) -> dict | None:
             "force_saisonnalite": round(float(force_saison), 4),
             "force_tendance":     round(float(force_trend),  4),
         }
-    except Exception:
-        return None
+    except Exception as e:
+        return {"erreur": str(e)}
 
 
 # ─────────────────────────────────────────────
@@ -107,8 +110,11 @@ def detecter_ruptures(x: np.ndarray, n_max: int = 5) -> list[int]:
     n = len(x)
     if n < 6:
         return []
+    # Sous-échantillonner si trop long pour rester rapide
+    step = max(1, n // 500)
+    indices = range(2, n - 2, step)
     scores = []
-    for i in range(2, n - 2):
+    for i in indices:
         m1, m2 = x[:i].mean(), x[i:].mean()
         scores.append((abs(m2 - m1), i))
     scores.sort(reverse=True)
@@ -134,10 +140,10 @@ def clustering_temporel(x: np.ndarray, k: int, fenetre: int = 3) -> dict:
         from sklearn.cluster import KMeans
         from sklearn.preprocessing import StandardScaler
     except ImportError:
-        return {"labels": None, "centres": None, "inertie": None}
+        return {"labels": None, "labels_full": None, "centres": None, "inertie": None, "n_clusters": 0}
 
     if len(x) < fenetre + 1:
-        return {"labels": None, "centres": None, "inertie": None}
+        return {"labels": None, "labels_full": None, "centres": None, "inertie": None, "n_clusters": 0}
 
     # Construire des vecteurs de features par fenêtre
     features = []
@@ -212,7 +218,7 @@ def afficher_rapport(serie_resultats: list[dict], croisees: list[tuple]):
 
         # STL
         stl = r.get("stl")
-        if stl:
+        if stl and "erreur" not in stl:
             print(f"  STL  → force saisonnalité={stl['force_saisonnalite']:.3f}  "
                   f"force tendance={stl['force_tendance']:.3f}")
             if stl["force_saisonnalite"] > 0.4:
@@ -220,7 +226,8 @@ def afficher_rapport(serie_resultats: list[dict], croisees: list[tuple]):
             if stl["force_tendance"] > 0.4:
                 print("         ↳ Tendance structurelle forte")
         else:
-            print("  STL  → série trop courte pour la décomposition")
+            raison = stl["erreur"] if stl else "non calculé"
+            print(f"  STL  → {raison}")
 
         # Ruptures
         breaks = r["ruptures"]
@@ -319,7 +326,7 @@ def tracer(serie_resultats: list[dict], series: dict[str, np.ndarray],
         # ── col 3 : STL résidu ou diff ────────────────────────────
         ax3 = fig.add_subplot(inner[3])
         stl = r.get("stl")
-        if stl:
+        if stl and "erreur" not in stl:
             ax3.fill_between(t, stl["resid"], alpha=0.6, color="purple")
             ax3.axhline(0, color="black", lw=0.5)
             ax3.set_title(f"Résidu STL\n(saison={stl['force_saisonnalite']:.2f})", fontsize=9)
