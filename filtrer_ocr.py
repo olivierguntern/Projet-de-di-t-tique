@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 
-def contient_chiffre(texte: str) -> bool:
-    return bool(re.search(r"\d", texte))
+def extraire_chiffres(texte: str) -> str:
+    return re.sub(r"\D", "", texte)
 
 
 def filtrer(chemin_in: str, chemin_out: str):
@@ -41,7 +41,9 @@ def filtrer(chemin_in: str, chemin_out: str):
         gardees = 0
         for row in reader:
             total += 1
-            if contient_chiffre(row["texte_ocr"]):
+            chiffres = extraire_chiffres(row["texte_ocr"])
+            if chiffres:
+                row["texte_ocr"] = chiffres
                 writer.writerow(row)
                 gardees += 1
 
