@@ -171,16 +171,17 @@ class OngletCapture(tk.Frame):
         self.lanceur = lanceur
 
         _titre(self, "Capture d'écran automatique",
-               "Prend une capture toutes les 10 secondes.\n"
+               "Capture à intervalle fixe ou aléatoire (ex: 28–32s).\n"
                "Sortie : captures/capture_YYYYMMDD_HHMMSS.png")
 
         corps = tk.Frame(self, bg=PANEL)
         corps.pack(fill=tk.BOTH, expand=True)
 
         self.duree  = tk.IntVar(value=5)
-        self.dossier = tk.StringVar(value="captures")
         self.delai  = tk.IntVar(value=3)
         self.ecran  = tk.IntVar(value=1)
+        self.i_min  = tk.IntVar(value=28)
+        self.i_max  = tk.IntVar(value=32)
 
         _ligne(corps, "Durée (minutes) :",
                ttk.Spinbox(corps, textvariable=self.duree,
@@ -193,6 +194,14 @@ class OngletCapture(tk.Frame):
         _ligne(corps, "Numéro d'écran :",
                ttk.Spinbox(corps, textvariable=self.ecran,
                            from_=1, to=4, width=8))
+        _ligne(corps, "Intervalle min (s) :",
+               ttk.Spinbox(corps, textvariable=self.i_min,
+                           from_=1, to=300, width=8),
+               note="intervalle aléatoire entre min et max")
+        _ligne(corps, "Intervalle max (s) :",
+               ttk.Spinbox(corps, textvariable=self.i_max,
+                           from_=1, to=300, width=8),
+               note="(mettre min=max pour intervalle fixe)")
 
         self.hotkey = tk.BooleanVar(value=False)
         row_hk = tk.Frame(corps, bg=PANEL)
@@ -221,10 +230,12 @@ class OngletCapture(tk.Frame):
 
         cmd = [
             sys.executable, "capture_ecran.py",
-            "--duree",  str(self.duree.get()),
-            "--dossier", dossier,
-            "--delai",  str(self.delai.get()),
-            "--ecran",  str(self.ecran.get()),
+            "--duree",          str(self.duree.get()),
+            "--dossier",        dossier,
+            "--delai",          str(self.delai.get()),
+            "--ecran",          str(self.ecran.get()),
+            "--intervalle-min", str(self.i_min.get()),
+            "--intervalle-max", str(self.i_max.get()),
         ]
         if self.hotkey.get():
             cmd.append("--hotkey")
