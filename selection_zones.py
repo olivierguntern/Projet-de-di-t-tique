@@ -220,7 +220,7 @@ def main():
     chemin_csv = args.csv or f"zones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
     if args.image:
-        image = cv2.imread(args.image)
+        image = cv2.imdecode(np.fromfile(args.image, dtype=np.uint8), cv2.IMREAD_COLOR)
         if image is None:
             print(f"Erreur : impossible d'ouvrir '{args.image}'.")
             return
