@@ -119,7 +119,7 @@ def etat_bordure(img: np.ndarray, z: dict, epaisseur: int, seuil_blanc: int) -> 
 def traiter_image(img_path: Path, zones_triees: list[dict],
                   epaisseur: int, seuil_blanc: int,
                   debug: bool = False) -> list[int] | None:
-    img = cv2.imread(str(img_path))
+    img = cv2.imdecode(np.fromfile(str(img_path), dtype=np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         print(f"  [ERREUR] Impossible de lire : {img_path.name}")
         return None
@@ -174,7 +174,8 @@ def main():
 
     if args.out is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out = f"etats_{ts}.csv"
+        base = Path(args.images) if args.images else Path(args.image).parent
+        args.out = str(base / f"etats_{ts}.csv")
 
     # En-têtes : image, timestamp, puis une colonne par zone
     entetes = ["image", "timestamp"] + [

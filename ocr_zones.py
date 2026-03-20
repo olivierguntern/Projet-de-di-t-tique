@@ -218,7 +218,8 @@ def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
 
     # Répertoire debug
     if debug:
-        Path("debug_zones").mkdir(exist_ok=True)
+        debug_dir = Path(images_dir) / "debug_zones"
+        debug_dir.mkdir(exist_ok=True)
 
     # Écriture CSV de sortie
     with open(chemin_out, "w", newline="", encoding="utf-8") as f:
@@ -227,7 +228,7 @@ def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
 
         for img_path in images:
             print(f"→ {img_path.name}")
-            image = cv2.imread(str(img_path))
+            image = cv2.imdecode(np.fromfile(str(img_path), dtype=np.uint8), cv2.IMREAD_COLOR)
             if image is None:
                 print(f"   ERREUR : impossible de charger l'image, ignorée.")
                 continue
@@ -265,9 +266,8 @@ def traiter(images_dir: str, zones: list[dict], engine: str, lang: str,
                 print(f"   Zone #{zone['id']} ({zone['label'] or '-'}) : {texte_csv[:80]}")
 
                 if debug:
-                    # Enregistre l'image prétraitée pour vérification
-                    nom = f"debug_zones/{img_path.stem}_z{zone['id']}.png"
-                    cv2.imwrite(nom, crop_traite)
+                    nom = str(debug_dir / f"{img_path.stem}_z{zone['id']}.png")
+                    cv2.imencode(".png", crop_traite)[1].tofile(nom)
 
         print(f"\nRésultats sauvegardés dans : {os.path.abspath(chemin_out)}")
 
@@ -302,7 +302,7 @@ def main():
         print(f"ERREUR : répertoire d'images introuvable : {args.images}")
         sys.exit(1)
 
-    chemin_out = args.out or f"resultats_ocr_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    chemin_out = args.out or str(Path(args.images) / f"resultats_ocr_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
     zones = charger_zones(args.zones)
     print(f"{len(zones)} zone(s) chargée(s) depuis {args.zones}")
 

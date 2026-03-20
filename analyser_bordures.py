@@ -202,10 +202,11 @@ def main():
         images = sorted(p for p in dossier.iterdir() if p.suffix.lower() in EXTENSIONS)
     print(f"{len(images)} image(s) a analyser.")
 
-    # CSV de sortie
+    # CSV de sortie : même dossier que les images
     if args.out is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out = f"bordures_{ts}.csv"
+        base = Path(args.images) if args.images else Path(args.image).parent
+        args.out = str(base / f"bordures_{ts}.csv")
 
     seuil_blanc = getattr(args, "seuil_blanc", 160)
 

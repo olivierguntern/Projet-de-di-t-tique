@@ -217,7 +217,12 @@ def main():
     )
     args = parser.parse_args()
 
-    chemin_csv = args.csv or f"zones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    if args.csv:
+        chemin_csv = args.csv
+    elif args.image:
+        chemin_csv = str(Path(args.image).parent / f"zones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+    else:
+        chemin_csv = f"zones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
     if args.image:
         image = cv2.imdecode(np.fromfile(args.image, dtype=np.uint8), cv2.IMREAD_COLOR)

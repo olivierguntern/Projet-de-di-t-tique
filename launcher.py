@@ -291,9 +291,8 @@ class OngletZones(_OngletBase):
         self._ligne("Image source :", self.champ_image,
                     note="(vide = capture d'écran auto)")
 
-        self.champ_csv = self._champ_fichier(mode="save")
-        self._ligne("CSV de sortie :", self.champ_csv,
-                    note="(vide = zones_DATE.csv)")
+        self.champ_csv = self._champ_fichier(valeur=r"D:\roulette\zones.csv", mode="save")
+        self._ligne("CSV de sortie :", self.champ_csv)
 
         self._btn_lancer("Lancer la sélection")
 
@@ -315,16 +314,16 @@ class OngletOCR(_OngletBase):
                          "Extrait le texte des zones sur toutes les images d'un dossier.\n"
                          "Sortie : resultats_ocr_YYYYMMDD_HHMMSS.csv")
 
-        self.champ_zones  = self._champ_fichier(valeur="zones.csv")
+        self.champ_zones  = self._champ_fichier(valeur=r"D:\roulette\zones.csv")
         self._ligne("Zones (CSV) :", self.champ_zones)
 
-        self.champ_images = ChampFichier(self.corps, valeur="captures",
+        self.champ_images = ChampFichier(self.corps, valeur=r"D:\roulette",
                                          mode="dir", bg=PANEL)
         self._ligne("Dossier images :", self.champ_images)
 
         self.champ_out = self._champ_fichier(mode="save")
         self._ligne("CSV de sortie :", self.champ_out,
-                    note="(vide = resultats_ocr_DATE.csv)")
+                    note="(vide = D:\\roulette\\resultats_ocr_DATE.csv)")
 
         self.engine = tk.StringVar(value="tesseract")
         self._ligne("Moteur OCR :",
@@ -352,7 +351,7 @@ class OngletOCR(_OngletBase):
         cmd = [
             sys.executable, "ocr_zones.py",
             "--zones",      self.champ_zones.get(),
-            "--images",     self.champ_images.get() or "captures",
+            "--images",     self.champ_images.get() or r"D:\roulette",
             "--engine",     self.engine.get(),
             "--preprocess", self.preprocess.get(),
         ]
@@ -654,16 +653,16 @@ class OngletEtats(_OngletBase):
                          "Analyse la couleur du bord de chaque zone (blanc=1, autre=0).\n"
                          "Sortie CSV : une ligne par image, zones triées haut→bas, gauche→droite.")
 
-        self.champ_zones = self._champ_fichier(valeur="zones.csv")
+        self.champ_zones = self._champ_fichier(valeur=r"D:\roulette\zones.csv")
         self._ligne("Zones (CSV) :", self.champ_zones)
 
-        self.champ_images = ChampFichier(self.corps, valeur="captures",
+        self.champ_images = ChampFichier(self.corps, valeur=r"D:\roulette",
                                          mode="dir", bg=PANEL)
         self._ligne("Dossier images :", self.champ_images)
 
         self.champ_out = self._champ_fichier(mode="save")
         self._ligne("CSV de sortie :", self.champ_out,
-                    note="(vide = etats_DATE.csv)")
+                    note="(vide = D:\\roulette\\etats_DATE.csv)")
 
         self.epaisseur = tk.IntVar(value=4)
         self._ligne("Épaisseur bord (px) :",
@@ -693,7 +692,7 @@ class OngletEtats(_OngletBase):
             return
         cmd = [
             sys.executable, "extraire_etats.py",
-            "--images",           self.champ_images.get() or "captures",
+            "--images",           self.champ_images.get() or r"D:\roulette",
             "--zones",            self.champ_zones.get(),
             "--epaisseur",        str(self.epaisseur.get()),
             "--seuil-blanc",      str(self.seuil_blanc.get()),
