@@ -131,8 +131,8 @@ def main():
     parser.add_argument(
         "--dossier",
         type=str,
-        default="captures",
-        help="Dossier de sauvegarde des captures (défaut: 'captures')"
+        default="D:\\roulette",
+        help="Dossier de sauvegarde des captures (défaut: 'D:\\roulette')"
     )
     parser.add_argument(
         "--intervalle",

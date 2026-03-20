@@ -187,7 +187,7 @@ class OngletCapture(tk.Frame):
                ttk.Spinbox(corps, textvariable=self.duree,
                            from_=1, to=120, width=8))
         _ligne(corps, "Dossier de sortie :",
-               ChampFichier(corps, valeur="captures", mode="dir", bg=PANEL))
+               ChampFichier(corps, valeur=r"D:\roulette", mode="dir", bg=PANEL))
         _ligne(corps, "Délai avant démarrage (s) :",
                ttk.Spinbox(corps, textvariable=self.delai,
                            from_=0, to=60, width=8))
@@ -218,14 +218,14 @@ class OngletCapture(tk.Frame):
 
     def _lancer(self):
         # Récupère le widget ChampFichier correctement
-        dossier = "captures"
+        dossier = r"D:\roulette"
         for w in self.winfo_children():
             if isinstance(w, tk.Frame):
                 for child in w.winfo_children():
                     if isinstance(child, tk.Frame):
                         for c in child.winfo_children():
                             if isinstance(c, ChampFichier):
-                                dossier = c.get() or "captures"
+                                dossier = c.get() or r"D:\roulette"
                                 break
 
         cmd = [
