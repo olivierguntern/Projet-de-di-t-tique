@@ -9,18 +9,40 @@ Usage :
     python capture_ecran.py --duree 10 --dossier mes_captures
     python capture_ecran.py --duree 5 --delai 5     # attend 5s avant de démarrer
     python capture_ecran.py --duree 5 --ecran 2     # capture l'écran n°2
+    python capture_ecran.py --duree 5 --hotkey      # attend Ctrl+Espace pour démarrer
 """
 
 import argparse
 import os
+import sys
 import time
 from datetime import datetime
 import mss
 import mss.tools
 
+# Force UTF-8 sur stdout/stderr (Windows cp1252)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
+def _attendre_hotkey():
+    """Bloque jusqu'à ce que Ctrl+Espace soit pressé."""
+    try:
+        import keyboard
+        print("En attente de Ctrl+Espace pour demarrer la capture...")
+        print("(installez 'keyboard' avec : pip install keyboard)")
+        keyboard.wait("ctrl+space")
+        print("Ctrl+Espace detecte — capture en cours !\n")
+    except ImportError:
+        print("ERREUR : la librairie 'keyboard' est requise pour --hotkey.")
+        print("Installez-la avec : pip install keyboard")
+        sys.exit(1)
+
 
 def capturer_ecran(dossier: str, duree_minutes: float, intervalle: int = 10,
-                   delai: int = 3, ecran: int = 1):
+                   delai: int = 3, ecran: int = 1, hotkey: bool = False):
     """
     Capture l'écran toutes les `intervalle` secondes pendant `duree_minutes` minutes.
 
@@ -30,6 +52,7 @@ def capturer_ecran(dossier: str, duree_minutes: float, intervalle: int = 10,
         intervalle: Intervalle entre chaque capture en secondes (défaut: 10)
         delai: Secondes d'attente avant la première capture (défaut: 3)
         ecran: Numéro de l'écran à capturer (1 = principal, 2 = second écran)
+        hotkey: Si True, attend Ctrl+Espace au lieu du compte à rebours
     """
     os.makedirs(dossier, exist_ok=True)
 
@@ -49,10 +72,14 @@ def capturer_ecran(dossier: str, duree_minutes: float, intervalle: int = 10,
     print(f"  - Captures   : {nb_captures}")
     print(f"  - Ecran      : {ecran} ({monitor['width']}x{monitor['height']})")
     print(f"  - Dossier    : {os.path.abspath(dossier)}")
-    print(f"  - Appuyez sur Ctrl+C pour arrêter\n")
+    if hotkey:
+        print(f"  - Démarrage  : Ctrl+Espace")
+    print(f"  - Arrêt      : Ctrl+C\n")
 
-    # Compte à rebours pour laisser le temps de minimiser le terminal
-    if delai > 0:
+    # Démarrage : hotkey ou compte à rebours
+    if hotkey:
+        _attendre_hotkey()
+    elif delai > 0:
         print(f"Début dans {delai} secondes... Minimisez cette fenêtre !")
         for i in range(delai, 0, -1):
             print(f"  {i}...")
@@ -111,6 +138,11 @@ def main():
         default=1,
         help="Numéro de l'écran à capturer : 1 = écran principal, 2 = second écran (défaut: 1)"
     )
+    parser.add_argument(
+        "--hotkey",
+        action="store_true",
+        help="Attendre Ctrl+Espace pour démarrer au lieu du compte à rebours (nécessite : pip install keyboard)"
+    )
 
     args = parser.parse_args()
 
@@ -122,7 +154,8 @@ def main():
         return
 
     try:
-        capturer_ecran(args.dossier, args.duree, args.intervalle, args.delai, args.ecran)
+        capturer_ecran(args.dossier, args.duree, args.intervalle,
+                       args.delai, args.ecran, args.hotkey)
     except KeyboardInterrupt:
         print("\nCapture interrompue par l'utilisateur.")
 

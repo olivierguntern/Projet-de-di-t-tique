@@ -194,6 +194,13 @@ class OngletCapture(tk.Frame):
                ttk.Spinbox(corps, textvariable=self.ecran,
                            from_=1, to=4, width=8))
 
+        self.hotkey = tk.BooleanVar(value=False)
+        row_hk = tk.Frame(corps, bg=PANEL)
+        row_hk.pack(fill=tk.X, pady=3)
+        ttk.Checkbutton(row_hk,
+                        text="Démarrer sur Ctrl+Espace (au lieu du compte à rebours)",
+                        variable=self.hotkey).pack(side=tk.LEFT)
+
         self._champ_dossier = corps.winfo_children()[1]  # ChampFichier
 
         ttk.Button(self, text="▶  Lancer la capture",
@@ -219,6 +226,8 @@ class OngletCapture(tk.Frame):
             "--delai",  str(self.delai.get()),
             "--ecran",  str(self.ecran.get()),
         ]
+        if self.hotkey.get():
+            cmd.append("--hotkey")
         self.lanceur.lancer(cmd)
 
 
