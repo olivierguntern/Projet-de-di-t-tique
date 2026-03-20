@@ -534,6 +534,67 @@ class OngletCycles(_OngletBase):
         self.lanceur.lancer(cmd)
 
 
+class OngletEtats(_OngletBase):
+    """3b. États bordures (blanc=1 / autre=0)."""
+
+    def __init__(self, parent, lanceur):
+        super().__init__(parent, lanceur,
+                         "États bordures — blanc=1 / rouge=0",
+                         "Analyse la couleur du bord de chaque zone (blanc=1, autre=0).\n"
+                         "Sortie CSV : une ligne par image, zones triées haut→bas, gauche→droite.")
+
+        self.champ_zones = self._champ_fichier(valeur="zones.csv")
+        self._ligne("Zones (CSV) :", self.champ_zones)
+
+        self.champ_images = ChampFichier(self.corps, valeur="captures",
+                                         mode="dir", bg=PANEL)
+        self._ligne("Dossier images :", self.champ_images)
+
+        self.champ_out = self._champ_fichier(mode="save")
+        self._ligne("CSV de sortie :", self.champ_out,
+                    note="(vide = etats_DATE.csv)")
+
+        self.epaisseur = tk.IntVar(value=4)
+        self._ligne("Épaisseur bord (px) :",
+                    ttk.Spinbox(self.corps, textvariable=self.epaisseur,
+                                from_=1, to=20, width=8))
+
+        self.seuil_blanc = tk.IntVar(value=160)
+        self._ligne("Seuil blanc (0-255) :",
+                    ttk.Spinbox(self.corps, textvariable=self.seuil_blanc,
+                                from_=50, to=255, width=8))
+
+        self.tolerance = tk.IntVar(value=20)
+        self._ligne("Tolérance rangée (px) :",
+                    ttk.Spinbox(self.corps, textvariable=self.tolerance,
+                                from_=5, to=100, width=8))
+
+        self.debug = tk.BooleanVar(value=False)
+        row = tk.Frame(self.corps, bg=PANEL)
+        row.pack(fill=tk.X, pady=3)
+        ttk.Checkbutton(row, text="Mode debug (affiche image annotée)",
+                        variable=self.debug).pack(side=tk.LEFT)
+
+        self._btn_lancer("Extraire les états")
+
+    def _lancer(self):
+        if not self._verif_input(self.champ_zones, "Zones (CSV)"):
+            return
+        cmd = [
+            sys.executable, "extraire_etats.py",
+            "--images",           self.champ_images.get() or "captures",
+            "--zones",            self.champ_zones.get(),
+            "--epaisseur",        str(self.epaisseur.get()),
+            "--seuil-blanc",      str(self.seuil_blanc.get()),
+            "--tolerance-rangee", str(self.tolerance.get()),
+        ]
+        if self.champ_out.get():
+            cmd += ["--out", self.champ_out.get()]
+        if self.debug.get():
+            cmd.append("--debug")
+        self.lanceur.lancer(cmd)
+
+
 class OngletPredire(_OngletBase):
     """9. Prédire seuil."""
 
@@ -579,15 +640,16 @@ class OngletPredire(_OngletBase):
 class Application(tk.Tk):
 
     ONGLETS = [
-        ("1. Capture",     OngletCapture),
-        ("2. Zones",       OngletZones),
-        ("3. OCR",         OngletOCR),
-        ("4. Filtrer",     OngletFiltrer),
-        ("5. Dédupliquer", OngletDedup),
-        ("6. Patterns",    OngletPatterns),
-        ("7. Comprendre",  OngletComprendre),
-        ("8. Cycles",      OngletCycles),
-        ("9. Prédire",     OngletPredire),
+        ("1. Capture",       OngletCapture),
+        ("2. Zones",         OngletZones),
+        ("3. OCR",           OngletOCR),
+        ("4. États bordures",OngletEtats),
+        ("5. Filtrer",       OngletFiltrer),
+        ("6. Dédupliquer",   OngletDedup),
+        ("7. Patterns",      OngletPatterns),
+        ("8. Comprendre",    OngletComprendre),
+        ("9. Cycles",        OngletCycles),
+        ("10. Prédire",      OngletPredire),
     ]
 
     def __init__(self):
