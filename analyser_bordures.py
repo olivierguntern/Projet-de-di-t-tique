@@ -212,7 +212,7 @@ def main():
     tous_resultats = []
     for img_path in images:
         print(f"\n-> {img_path.name}")
-        img = cv2.imread(str(img_path))
+        img = cv2.imdecode(np.fromfile(str(img_path), dtype=np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             print(f"   [ERREUR] Impossible de lire l'image.")
             continue

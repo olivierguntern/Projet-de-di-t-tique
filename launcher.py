@@ -363,6 +363,97 @@ class OngletOCR(_OngletBase):
         self.lanceur.lancer(cmd)
 
 
+class OngletBordures(_OngletBase):
+    """3b. Analyser bordures (couleur brute)."""
+
+    def __init__(self, parent, lanceur):
+        super().__init__(parent, lanceur,
+                         "Analyser bordures",
+                         "Détecte la couleur (blanc / rouge / inconnu) du bord de chaque zone.\n"
+                         "Sortie CSV : image, id, label, couleur, scores R/G/B.")
+
+        self.champ_zones = self._champ_fichier(valeur=r"D:\roulette\zones.csv")
+        self._ligne("Zones (CSV) :", self.champ_zones)
+
+        # Mode : image unique ou dossier
+        self.mode = tk.StringVar(value="dossier")
+        row_mode = tk.Frame(self.corps, bg=PANEL)
+        row_mode.pack(fill=tk.X, pady=3)
+        ttk.Radiobutton(row_mode, text="Image unique",
+                        variable=self.mode, value="image",
+                        command=self._maj_mode).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Radiobutton(row_mode, text="Dossier d'images",
+                        variable=self.mode, value="dossier",
+                        command=self._maj_mode).pack(side=tk.LEFT)
+
+        self.row_image = tk.Frame(self.corps, bg=PANEL)
+        tk.Label(self.row_image, text="Image :", width=24, anchor="w",
+                 bg=PANEL, fg=TEXTE, font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        self.champ_image = ChampFichier(self.row_image,
+                                        types=[("Images", "*.png *.jpg *.jpeg *.bmp")],
+                                        bg=PANEL)
+        self.champ_image.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self.row_images = tk.Frame(self.corps, bg=PANEL)
+        tk.Label(self.row_images, text="Dossier images :", width=24, anchor="w",
+                 bg=PANEL, fg=TEXTE, font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        self.champ_images = ChampFichier(self.row_images, valeur=r"D:\roulette",
+                                         mode="dir", bg=PANEL)
+        self.champ_images.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self.champ_out = self._champ_fichier(mode="save")
+        self._ligne("CSV de sortie :", self.champ_out,
+                    note="(vide = bordures_DATE.csv)")
+
+        self.epaisseur = tk.IntVar(value=4)
+        self._ligne("Épaisseur bord (px) :",
+                    ttk.Spinbox(self.corps, textvariable=self.epaisseur,
+                                from_=1, to=20, width=8))
+
+        self.seuil_blanc = tk.IntVar(value=160)
+        self._ligne("Seuil blanc (0-255) :",
+                    ttk.Spinbox(self.corps, textvariable=self.seuil_blanc,
+                                from_=50, to=255, width=8))
+
+        self.debug = tk.BooleanVar(value=False)
+        row_dbg = tk.Frame(self.corps, bg=PANEL)
+        row_dbg.pack(fill=tk.X, pady=3)
+        ttk.Checkbutton(row_dbg, text="Mode debug (affiche image annotée)",
+                        variable=self.debug).pack(side=tk.LEFT)
+
+        self._btn_lancer("Analyser les bordures")
+        self._maj_mode()
+
+    def _maj_mode(self):
+        if self.mode.get() == "image":
+            self.row_image.pack(fill=tk.X, pady=3)
+            self.row_images.pack_forget()
+        else:
+            self.row_image.pack_forget()
+            self.row_images.pack(fill=tk.X, pady=3)
+
+    def _lancer(self):
+        if not self._verif_input(self.champ_zones, "Zones (CSV)"):
+            return
+        cmd = [
+            sys.executable, "analyser_bordures.py",
+            "--zones",       self.champ_zones.get(),
+            "--epaisseur",   str(self.epaisseur.get()),
+            "--seuil-blanc", str(self.seuil_blanc.get()),
+        ]
+        if self.mode.get() == "image":
+            if not self.champ_image.get():
+                return
+            cmd += ["--image", self.champ_image.get()]
+        else:
+            cmd += ["--images", self.champ_images.get() or r"D:\roulette"]
+        if self.champ_out.get():
+            cmd += ["--out", self.champ_out.get()]
+        if self.debug.get():
+            cmd.append("--debug")
+        self.lanceur.lancer(cmd)
+
+
 class OngletFiltrer(_OngletBase):
     """4. Filtrer OCR."""
 
@@ -662,8 +753,9 @@ class Application(tk.Tk):
     ONGLETS = [
         ("1. Capture",       OngletCapture),
         ("2. Zones",         OngletZones),
-        ("3. OCR",           OngletOCR),
-        ("4. États bordures",OngletEtats),
+        ("3. OCR",              OngletOCR),
+        ("3b. Bordures",        OngletBordures),
+        ("4. États bordures",   OngletEtats),
         ("5. Filtrer",       OngletFiltrer),
         ("6. Dédupliquer",   OngletDedup),
         ("7. Patterns",      OngletPatterns),
